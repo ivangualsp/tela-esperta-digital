@@ -6,6 +6,7 @@ import { Device } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useApp } from '@/context/AppContext';
+import { toast } from 'sonner';
 import { 
   Dialog,
   DialogContent,
