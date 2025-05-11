@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 import Dashboard from "./pages/Dashboard";
 import MediaList from "./pages/MediaList";
+import MediaForm from "./pages/MediaForm";
 import PlaylistList from "./pages/PlaylistList";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import DeviceList from "./pages/DeviceList";
@@ -25,6 +26,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/media" element={<MediaList />} />
+            <Route path="/media/new" element={<MediaForm />} />
+            <Route path="/media/:id/edit" element={<MediaForm editMode />} />
             <Route path="/playlists" element={<PlaylistList />} />
             <Route path="/playlists/:id" element={<PlaylistDetail />} />
             <Route path="/devices" element={<DeviceList />} />
