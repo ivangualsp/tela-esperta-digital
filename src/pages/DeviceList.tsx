@@ -150,7 +150,7 @@ const DeviceList: React.FC = () => {
                   <SelectValue placeholder="Selecione uma playlist" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {playlists.map(playlist => (
                     <SelectItem key={playlist.id} value={playlist.id}>
                       {playlist.name}
@@ -203,7 +203,7 @@ const DeviceList: React.FC = () => {
                   <SelectValue placeholder="Selecione uma playlist" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {playlists.map(playlist => (
                     <SelectItem key={playlist.id} value={playlist.id}>
                       {playlist.name}
