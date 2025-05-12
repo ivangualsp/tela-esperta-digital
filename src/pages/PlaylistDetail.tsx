@@ -22,6 +22,7 @@ import {
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { Media } from '@/types';
 
 const PlaylistDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,7 +43,7 @@ const PlaylistDetail: React.FC = () => {
   }, [id, playlists, getPlaylistById, navigate]);
 
   const availableMedia = mediaItems.filter(
-    (media) => !playlist?.mediaItems.find((item: any) => item.id === media.id)
+    (media) => !playlist?.mediaItems.find((item: Media) => item.id === media.id)
   );
 
   const handleAddMedia = (mediaId: string) => {
@@ -80,7 +81,7 @@ const PlaylistDetail: React.FC = () => {
     
     // Atualizar a ordem no contexto da aplicação
     if (id) {
-      const newOrder = items.map(item => item.id);
+      const newOrder = items.map((item: Media) => item.id);
       updatePlaylistMediaOrder(id, newOrder);
       toast.success('Ordem da playlist atualizada');
     }
@@ -106,7 +107,7 @@ const PlaylistDetail: React.FC = () => {
     items.splice(newIndex, 0, item);
     
     // Atualizar a ordem
-    const newOrder = items.map(item => item.id);
+    const newOrder = items.map((item: Media) => item.id);
     updatePlaylistMediaOrder(id, newOrder);
   };
 
@@ -154,7 +155,7 @@ const PlaylistDetail: React.FC = () => {
                       {...provided.droppableProps}
                       ref={provided.innerRef}
                     >
-                      {playlist.mediaItems.map((media: any, index: number) => (
+                      {playlist.mediaItems.map((media: Media, index: number) => (
                         <Draggable key={media.id} draggableId={media.id} index={index}>
                           {(provided) => (
                             <div 
