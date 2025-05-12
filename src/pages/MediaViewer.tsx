@@ -80,7 +80,12 @@ const MediaViewer: React.FC = () => {
             const playlistInfo = getPlaylistById(deviceInfo.playlistId);
             if (playlistInfo && playlistInfo.mediaItems.length > 0) {
               setPlaylist(playlistInfo);
+              console.log('Playlist carregada:', playlistInfo);
+            } else {
+              console.log('Playlist vazia ou não encontrada');
             }
+          } else {
+            console.log('Dispositivo sem playlist atribuída');
           }
         } else {
           toast.error('Dispositivo não encontrado');
@@ -112,12 +117,18 @@ const MediaViewer: React.FC = () => {
   
   // Função para renderizar o conteúdo da mídia atual
   const renderMedia = () => {
-    if (!currentMedia) return null;
+    if (!currentMedia) {
+      console.log('Nenhuma mídia atual para renderizar');
+      return null;
+    }
+    
+    console.log('Renderizando mídia:', currentMedia.type, currentMedia.content);
     
     switch (currentMedia.type) {
       case 'video':
         if (currentMedia.content.includes('youtube.com/embed/')) {
           // For YouTube videos
+          console.log('Renderizando vídeo do YouTube');
           return (
             <div className="w-full h-full flex items-center justify-center">
               <iframe 
@@ -132,33 +143,42 @@ const MediaViewer: React.FC = () => {
           );
         } else {
           // For local videos
+          console.log('Renderizando vídeo local');
           return (
             <video 
-              key={currentMedia.id}
+              key={`video-${currentMedia.id}-${Date.now()}`}
               ref={videoRef}
               src={currentMedia.content} 
               className="w-full h-full object-contain"
-              autoPlay 
+              autoPlay
+              muted={false}
               loop={false}
               playsInline
-              controls={false}
-              onEnded={() => advanceToNextMedia()}
+              controls
+              onLoadedData={() => console.log('Vídeo carregado')}
+              onPlay={() => console.log('Vídeo iniciou reprodução')}
+              onEnded={() => {
+                console.log('Vídeo terminou');
+                advanceToNextMedia();
+              }}
               onError={(e) => {
-                console.error('Video error:', e);
-                // Advance to next media if there's an error playing this video
+                console.error('Erro no vídeo:', e);
                 setTimeout(advanceToNextMedia, 1000);
               }}
             />
           );
         }
       case 'image':
+        console.log('Renderizando imagem');
         return (
           <img 
+            key={`img-${currentMedia.id}`}
             src={currentMedia.content} 
             alt={currentMedia.title} 
             className="w-full h-full object-contain"
+            onLoad={() => console.log('Imagem carregada')}
             onError={() => {
-              console.error('Image failed to load:', currentMedia.content);
+              console.error('Falha ao carregar imagem:', currentMedia.content);
               setTimeout(advanceToNextMedia, 1000);
             }}
           />
@@ -187,6 +207,8 @@ const MediaViewer: React.FC = () => {
     const currentMedia = playlist.mediaItems[currentMediaIndex];
     if (!currentMedia) return;
     
+    console.log('Mídia atual:', currentMedia.type, currentMedia.title, 'Duração:', currentMedia.duration);
+    
     // Clean up previous timers
     if (youtubeTimerRef.current) {
       clearTimeout(youtubeTimerRef.current);
@@ -195,9 +217,10 @@ const MediaViewer: React.FC = () => {
     
     // Para vídeos do YouTube, usamos um timer já que não temos acesso diretamente ao evento de fim
     if (currentMedia.type === 'video' && currentMedia.content.includes('youtube.com/embed/')) {
+      console.log('Configurando timer para vídeo do YouTube:', currentMedia.duration || 10, 'segundos');
       youtubeTimerRef.current = window.setTimeout(() => {
         advanceToNextMedia();
-      }, (currentMedia.duration || 8) * 1000); // Usamos a duração configurada ou 8 segundos como fallback
+      }, (currentMedia.duration || 10) * 1000); // Usamos a duração configurada ou 10 segundos como fallback
       
       return () => {
         if (youtubeTimerRef.current) {
@@ -216,9 +239,10 @@ const MediaViewer: React.FC = () => {
         
         const playVideo = () => {
           videoElement.play().catch(err => {
-            console.error('Error playing video:', err);
+            console.error('Erro ao reproduzir vídeo:', err);
             // If autoplay fails, set a timer as fallback
-            window.setTimeout(() => advanceToNextMedia(), (currentMedia.duration || 5) * 1000);
+            console.log('Usando timer como fallback para vídeo local');
+            window.setTimeout(() => advanceToNextMedia(), (currentMedia.duration || 8) * 1000);
           });
         };
         
@@ -226,6 +250,7 @@ const MediaViewer: React.FC = () => {
         playVideo();
         
         const handleVideoEnd = () => {
+          console.log('Evento de fim de vídeo detectado');
           advanceToNextMedia();
         };
         
@@ -235,17 +260,19 @@ const MediaViewer: React.FC = () => {
         };
       } else {
         // Fallback if video element reference is not available
+        console.log('Referência do vídeo não disponível, usando timer como fallback');
         const timer = window.setTimeout(() => {
           advanceToNextMedia();
-        }, (currentMedia.duration || 5) * 1000);
+        }, (currentMedia.duration || 8) * 1000);
         
         return () => clearTimeout(timer);
       }
     } else if (currentMedia.type !== 'video') {
       // Para outros tipos de mídia, usamos o tempo de duração configurado
+      console.log('Configurando timer para mídia não-vídeo:', currentMedia.duration || 8, 'segundos');
       const timer = window.setTimeout(() => {
         advanceToNextMedia();
-      }, (currentMedia.duration || 5) * 1000);
+      }, (currentMedia.duration || 8) * 1000);
       
       return () => clearTimeout(timer);
     }
