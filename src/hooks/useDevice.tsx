@@ -19,7 +19,7 @@ export const useDevice = () => {
       }
 
       // Imprimindo informações detalhadas para debug
-      console.log('URL base Supabase:', supabase.getUrl());
+      console.log('URL base Supabase:', import.meta.env.VITE_SUPABASE_URL || 'Não disponível');
       
       // Usando a consulta correta para o Supabase
       const { data, error } = await supabase
