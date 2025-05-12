@@ -8,6 +8,7 @@ import Layout from '@/components/Layout';
 import MediaCard from '@/components/MediaCard';
 import PlaylistCard from '@/components/PlaylistCard';
 import DeviceCard from '@/components/DeviceCard';
+import SyncDatabase from '@/components/SyncDatabase';
 
 const Dashboard: React.FC = () => {
   const { mediaItems, playlists, devices } = useApp();
@@ -16,6 +17,9 @@ const Dashboard: React.FC = () => {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+        <div className="flex gap-2">
+          <SyncDatabase />
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
