@@ -36,14 +36,25 @@ const MediaViewer: React.FC = () => {
 
   // Efeito inicial para configurar o intervalo de atualização
   useEffect(() => {
+    console.log('Configurando intervalo de atualização');
+    
+    // Limpa qualquer intervalo existente antes de criar um novo
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
+    
     // Configura o intervalo de atualização a cada 30 segundos
     refreshIntervalRef.current = window.setInterval(() => {
+      console.log('Executando atualização programada');
       refreshContent();
     }, 30000);
     
     return () => {
+      console.log('Limpando intervalo de atualização');
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
       }
     };
   }, [refreshContent]);

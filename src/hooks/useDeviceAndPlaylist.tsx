@@ -24,17 +24,25 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
     try {
       console.log('Buscando dispositivo pelo token:', tokenValue);
       
-      // Modificação principal: alterando a forma como fazemos a consulta
-      // Usando .eq sem o prefixo "eq." no valor do parâmetro
+      if (!tokenValue || tokenValue.trim() === '') {
+        console.error('Token inválido ou vazio');
+        return null;
+      }
+      
+      // Usando a consulta correta para o Supabase
       const { data, error } = await supabase
         .from('devices')
         .select('*')
-        .eq('token', tokenValue);
+        .eq('token', tokenValue.trim());
       
       if (error) {
         console.error('Erro ao buscar dispositivo:', error);
+        toast.error('Erro ao buscar dispositivo');
         return null;
       }
+      
+      // Log detalhado para depuração
+      console.log('Resposta da consulta:', data);
       
       // Verificar se temos pelo menos um resultado
       if (!data || data.length === 0) {
@@ -48,6 +56,7 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
       return deviceFound;
     } catch (error) {
       console.error('Exceção ao buscar dispositivo:', error);
+      toast.error('Erro ao conectar com o servidor');
       return null;
     }
   }, []);
@@ -125,7 +134,11 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   
   // Função para atualizar o conteúdo do visualizador
   const refreshContent = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      console.log('Token não fornecido');
+      setIsLoading(false);
+      return;
+    }
     
     console.log('Atualizando conteúdo para o token:', token);
     setIsLoading(true);
@@ -148,11 +161,17 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
         
         if (playlistInfo && (!playlist || 
             playlist.updated_at !== playlistInfo.updated_at || 
-            playlist.mediaItems.length !== playlistInfo.mediaItems.length)) {
+            playlist.mediaItems?.length !== playlistInfo.mediaItems.length)) {
           
           setPlaylist(playlistInfo);
           toast.success('Conteúdo atualizado');
+        } else if (!playlistInfo) {
+          console.log('Playlist não encontrada ou vazia');
+          setPlaylist(null);
         }
+      } else {
+        console.log('Dispositivo não tem playlist associada');
+        setPlaylist(null);
       }
     } catch (error) {
       console.error('Erro ao atualizar conteúdo:', error);
@@ -171,7 +190,11 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   // Efeito inicial para carregar o dispositivo e playlist
   useEffect(() => {
     if (token) {
+      console.log('Inicializando com token:', token);
       refreshContent();
+    } else {
+      console.log('Nenhum token fornecido na inicialização');
+      setIsLoading(false);
     }
   }, [token, refreshContent]);
 
