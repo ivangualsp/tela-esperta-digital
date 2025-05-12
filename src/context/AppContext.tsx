@@ -215,7 +215,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: uuidv4(),
       name,
       description,
-      token: uuidv4(),
+      token: uuidv4(),  // Garante token único
       playlistId: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -262,6 +262,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const getDeviceByToken = (token: string) => {
+    if (!token) return undefined;
+    
+    // Garantimos que a comparação é case-sensitive e exata
     return devices.find((device) => device.token === token);
   };
 

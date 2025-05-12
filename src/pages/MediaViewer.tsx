@@ -62,26 +62,29 @@ const MediaViewer: React.FC = () => {
   // Efeito inicial para carregar o dispositivo e playlist
   useEffect(() => {
     if (token) {
-      const deviceInfo = getDeviceByToken(token);
-      if (deviceInfo) {
-        setDevice(deviceInfo);
-        updateDeviceActivity(deviceInfo.id);
-        
-        if (deviceInfo.playlistId) {
-          const playlistInfo = getPlaylistById(deviceInfo.playlistId);
-          if (playlistInfo && playlistInfo.mediaItems.length > 0) {
-            setPlaylist(playlistInfo);
-            setIsLoading(false);
-          } else {
-            setIsLoading(false);
+      try {
+        const deviceInfo = getDeviceByToken(token);
+        if (deviceInfo) {
+          setDevice(deviceInfo);
+          updateDeviceActivity(deviceInfo.id);
+          
+          if (deviceInfo.playlistId) {
+            const playlistInfo = getPlaylistById(deviceInfo.playlistId);
+            if (playlistInfo && playlistInfo.mediaItems.length > 0) {
+              setPlaylist(playlistInfo);
+            }
           }
         } else {
-          setIsLoading(false);
+          toast.error('Dispositivo não encontrado');
         }
-      } else {
+      } catch (error) {
+        console.error('Erro ao carregar dispositivo:', error);
+        toast.error('Erro ao carregar dispositivo');
+      } finally {
         setIsLoading(false);
-        toast.error('Dispositivo não encontrado');
       }
+    } else {
+      setIsLoading(false);
     }
     
     // Configura o intervalo de atualização a cada 30 segundos
@@ -96,13 +99,77 @@ const MediaViewer: React.FC = () => {
     };
   }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity, refreshContent]);
   
+  // Função para renderizar o conteúdo da mídia atual
+  const renderMedia = () => {
+    if (!currentMedia) return null;
+    
+    switch (currentMedia.type) {
+      case 'video':
+        if (currentMedia.content.includes('youtube.com/embed/')) {
+          return (
+            <div className="w-full h-full flex items-center justify-center">
+              <iframe 
+                src={currentMedia.content} 
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={currentMedia.title}
+              />
+            </div>
+          );
+        } else {
+          return (
+            <video 
+              key={currentMedia.id}
+              ref={videoRef}
+              src={currentMedia.content} 
+              className="w-full h-full object-contain"
+              autoPlay 
+              muted
+              playsInline
+              onError={(e) => console.error('Video error:', e)}
+            />
+          );
+        }
+      case 'image':
+        return (
+          <img 
+            src={currentMedia.content} 
+            alt={currentMedia.title} 
+            className="w-full h-full object-contain"
+          />
+        );
+      case 'news':
+        return (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-white p-8 overflow-auto">
+            <h2 className="text-3xl font-bold text-gray-800 mb-6">{currentMedia.title}</h2>
+            <div 
+              className="text-gray-700 text-xl max-w-4xl"
+              dangerouslySetInnerHTML={{ __html: currentMedia.content }} 
+            />
+          </div>
+        );
+      default:
+        return <div>Tipo de mídia não suportado</div>;
+    }
+  };
+  
   // Efeito para avançar automaticamente para o próximo item da playlist
   useEffect(() => {
     if (playlist && playlist.mediaItems.length > 0) {
       const currentMedia = playlist.mediaItems[currentMediaIndex];
       
-      // Para vídeos, esperamos o evento de finalização em vez de usar um timer
-      if (currentMedia.type === 'video' && videoRef.current) {
+      // Para vídeos do YouTube, usamos um timer já que não temos acesso diretamente ao evento de fim
+      if (currentMedia.type === 'video' && currentMedia.content.includes('youtube.com/embed/')) {
+        const timer = setTimeout(() => {
+          advanceToNextMedia();
+        }, (currentMedia.duration || 5) * 1000); // Usamos a duração configurada ou 5 segundos como fallback
+        
+        return () => clearTimeout(timer);
+      }
+      
+      // Para vídeos normais, esperamos o evento de finalização em vez de usar um timer
+      else if (currentMedia.type === 'video' && videoRef.current) {
         const videoElement = videoRef.current;
         
         const handleVideoEnd = () => {
@@ -118,7 +185,7 @@ const MediaViewer: React.FC = () => {
         // Para outros tipos de mídia, usamos o tempo de duração configurado
         const timer = setTimeout(() => {
           advanceToNextMedia();
-        }, currentMedia.duration * 1000);
+        }, (currentMedia.duration || 5) * 1000);
         
         return () => clearTimeout(timer);
       }
@@ -142,7 +209,14 @@ const MediaViewer: React.FC = () => {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white">
         <h1 className="text-2xl mb-4">Dispositivo não encontrado</h1>
-        <p>O token fornecido não corresponde a nenhum dispositivo registrado.</p>
+        <p className="text-center px-4">O token fornecido não corresponde a nenhum dispositivo registrado ou houve um erro de comunicação.</p>
+        <button 
+          onClick={handleManualRefresh}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+        >
+          Tentar novamente
+        </button>
+        <p className="mt-4 text-sm text-gray-400">Token: {token || 'Não fornecido'}</p>
       </div>
     );
   }
@@ -166,44 +240,6 @@ const MediaViewer: React.FC = () => {
   }
 
   const currentMedia: Media = playlist.mediaItems[currentMediaIndex];
-
-  const renderMedia = () => {
-    switch (currentMedia.type) {
-      case 'video':
-        return (
-          <video 
-            key={currentMedia.id}
-            ref={videoRef}
-            src={currentMedia.content} 
-            className="w-full h-full object-contain"
-            autoPlay 
-            muted
-            playsInline
-            onError={(e) => console.error('Video error:', e)}
-          />
-        );
-      case 'image':
-        return (
-          <img 
-            src={currentMedia.content} 
-            alt={currentMedia.title} 
-            className="w-full h-full object-contain"
-          />
-        );
-      case 'news':
-        return (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-white p-8 overflow-auto">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6">{currentMedia.title}</h2>
-            <div 
-              className="text-gray-700 text-xl max-w-4xl"
-              dangerouslySetInnerHTML={{ __html: currentMedia.content }} 
-            />
-          </div>
-        );
-      default:
-        return <div>Tipo de mídia não suportado</div>;
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
