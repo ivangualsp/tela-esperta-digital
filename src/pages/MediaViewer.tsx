@@ -124,8 +124,9 @@ const MediaViewer: React.FC = () => {
       const playlistInfo = await fetchPlaylistById(deviceInfo.playlist_id);
       
       // Se a playlist mudou ou foi atualizada, reiniciamos a exibição
+      // Corrigido: usando updated_at em vez de updatedAt para compatibilidade com o Supabase
       if (playlistInfo && (!playlist || 
-          playlist.updatedAt !== playlistInfo.updatedAt || 
+          playlist.updated_at !== playlistInfo.updated_at || 
           playlist.mediaItems.length !== playlistInfo.mediaItems.length)) {
         
         setPlaylist(playlistInfo);
