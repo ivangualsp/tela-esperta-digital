@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { useApp } from '@/context/AppContext';
 import { Media } from '@/types';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const MediaViewer: React.FC = () => {
   const { token } = useParams<{ token: string }>();
-  const { getDeviceByToken, getPlaylistById, updateDeviceActivity } = useApp();
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [playlist, setPlaylist] = useState<any>(null);
   const [device, setDevice] = useState<any>(null);
@@ -19,21 +18,110 @@ const MediaViewer: React.FC = () => {
   const youtubeTimerRef = useRef<number | null>(null);
   const youtubePlayerRef = useRef<HTMLIFrameElement | null>(null);
   
+  // Função para buscar dispositivo pelo token
+  const fetchDeviceByToken = useCallback(async (tokenValue: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('token', tokenValue)
+        .single();
+      
+      if (error) {
+        console.error('Erro ao buscar dispositivo:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar dispositivo:', error);
+      return null;
+    }
+  }, []);
+  
+  // Função para buscar playlist pelo ID
+  const fetchPlaylistById = useCallback(async (playlistId: string) => {
+    try {
+      // Primeiro buscamos os detalhes da playlist
+      const { data: playlistData, error: playlistError } = await supabase
+        .from('playlists')
+        .select('*')
+        .eq('id', playlistId)
+        .single();
+      
+      if (playlistError || !playlistData) {
+        console.error('Erro ao buscar playlist:', playlistError);
+        return null;
+      }
+      
+      // Depois buscamos os itens da playlist com seus respectivos dados de mídia
+      const { data: playlistMediaItems, error: mediaItemsError } = await supabase
+        .from('playlist_media')
+        .select(`
+          id, 
+          position,
+          media:media_id (
+            id, 
+            title, 
+            type, 
+            content, 
+            duration
+          )
+        `)
+        .eq('playlist_id', playlistId)
+        .order('position', { ascending: true });
+      
+      if (mediaItemsError) {
+        console.error('Erro ao buscar itens da playlist:', mediaItemsError);
+        return null;
+      }
+      
+      // Transformamos os dados para o formato esperado pelo componente
+      const mediaItems = playlistMediaItems
+        .filter(item => item.media) // Filtra itens sem mídia
+        .map(item => item.media);
+      
+      return {
+        ...playlistData,
+        mediaItems
+      };
+    } catch (error) {
+      console.error('Erro ao buscar playlist:', error);
+      return null;
+    }
+  }, []);
+  
+  // Função para atualizar a atividade do dispositivo
+  const updateDeviceActivity = useCallback(async (deviceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .update({ last_active: new Date().toISOString() })
+        .eq('id', deviceId);
+      
+      if (error) {
+        console.error('Erro ao atualizar atividade do dispositivo:', error);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar atividade do dispositivo:', error);
+    }
+  }, []);
+  
   // Função para atualizar o conteúdo do visualizador
-  const refreshContent = useCallback(() => {
+  const refreshContent = useCallback(async () => {
     if (!token) return;
     
-    const deviceInfo = getDeviceByToken(token);
+    const deviceInfo = await fetchDeviceByToken(token);
     if (!deviceInfo) {
       toast.error('Dispositivo não encontrado');
       return;
     }
     
-    updateDeviceActivity(deviceInfo.id);
+    await updateDeviceActivity(deviceInfo.id);
     setDevice(deviceInfo);
     
-    if (deviceInfo.playlistId) {
-      const playlistInfo = getPlaylistById(deviceInfo.playlistId);
+    if (deviceInfo.playlist_id) {
+      const playlistInfo = await fetchPlaylistById(deviceInfo.playlist_id);
       
       // Se a playlist mudou ou foi atualizada, reiniciamos a exibição
       if (playlistInfo && (!playlist || 
@@ -48,7 +136,7 @@ const MediaViewer: React.FC = () => {
     }
     
     setLastUpdated(Date.now());
-  }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity, playlist]);
+  }, [token, fetchDeviceByToken, fetchPlaylistById, updateDeviceActivity, playlist]);
   
   const advanceToNextMedia = useCallback(() => {
     // Clear any existing YouTube timer
@@ -60,7 +148,7 @@ const MediaViewer: React.FC = () => {
     setTransitionActive(true);
     setTimeout(() => {
       setCurrentMediaIndex((prevIndex) => {
-        const nextIndex = prevIndex + 1 >= (playlist?.mediaItems.length || 0) ? 0 : prevIndex + 1;
+        const nextIndex = prevIndex + 1 >= (playlist?.mediaItems?.length || 0) ? 0 : prevIndex + 1;
         return nextIndex;
       });
       setTransitionActive(false);
@@ -69,16 +157,26 @@ const MediaViewer: React.FC = () => {
   
   // Efeito inicial para carregar o dispositivo e playlist
   useEffect(() => {
-    if (token) {
+    let isMounted = true;
+    
+    const initializeViewer = async () => {
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+      
       try {
-        const deviceInfo = getDeviceByToken(token);
+        const deviceInfo = await fetchDeviceByToken(token);
+        
+        if (!isMounted) return;
+        
         if (deviceInfo) {
           setDevice(deviceInfo);
-          updateDeviceActivity(deviceInfo.id);
+          await updateDeviceActivity(deviceInfo.id);
           
-          if (deviceInfo.playlistId) {
-            const playlistInfo = getPlaylistById(deviceInfo.playlistId);
-            if (playlistInfo && playlistInfo.mediaItems.length > 0) {
+          if (deviceInfo.playlist_id) {
+            const playlistInfo = await fetchPlaylistById(deviceInfo.playlist_id);
+            if (playlistInfo && playlistInfo.mediaItems?.length > 0) {
               setPlaylist(playlistInfo);
               console.log('Playlist carregada:', playlistInfo);
             } else {
@@ -94,11 +192,13 @@ const MediaViewer: React.FC = () => {
         console.error('Erro ao carregar dispositivo:', error);
         toast.error('Erro ao carregar dispositivo');
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    } else {
-      setIsLoading(false);
-    }
+    };
+    
+    initializeViewer();
     
     // Configura o intervalo de atualização a cada 30 segundos
     refreshIntervalRef.current = window.setInterval(() => {
@@ -106,6 +206,7 @@ const MediaViewer: React.FC = () => {
     }, 30000);
     
     return () => {
+      isMounted = false;
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
       }
@@ -113,7 +214,7 @@ const MediaViewer: React.FC = () => {
         clearTimeout(youtubeTimerRef.current);
       }
     };
-  }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity, refreshContent]);
+  }, [token, fetchDeviceByToken, fetchPlaylistById, updateDeviceActivity, refreshContent]);
   
   // Função para renderizar o conteúdo da mídia atual
   const renderMedia = () => {
@@ -200,7 +301,7 @@ const MediaViewer: React.FC = () => {
   
   // Efeito para avançar automaticamente para o próximo item da playlist
   useEffect(() => {
-    if (!playlist || !playlist.mediaItems.length || currentMediaIndex >= playlist.mediaItems.length) {
+    if (!playlist || !playlist.mediaItems || !playlist.mediaItems.length || currentMediaIndex >= playlist.mediaItems.length) {
       return;
     }
     
@@ -307,7 +408,7 @@ const MediaViewer: React.FC = () => {
     );
   }
 
-  if (!playlist || playlist.mediaItems.length === 0) {
+  if (!playlist || !playlist.mediaItems || playlist.mediaItems.length === 0) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white">
         <h1 className="text-2xl mb-4">Sem conteúdo para exibir</h1>
