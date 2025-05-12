@@ -49,6 +49,19 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
     }
   }, [editMode, id, mediaItems, navigate]);
 
+  // Function to convert YouTube URLs to embed format
+  const getEmbedUrl = (url: string): string => {
+    // Handle YouTube URLs
+    const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(youtubeRegex);
+    
+    if (match && match[1]) {
+      return `https://www.youtube.com/embed/${match[1]}`;
+    }
+    
+    return url; // Return original URL if not YouTube or couldn't extract ID
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -56,16 +69,19 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
       toast.error('Por favor, preencha todos os campos corretamente');
       return;
     }
+
+    // Process content URL if it's a video
+    const processedContent = mediaType === 'video' ? getEmbedUrl(content) : content;
     
     if (editMode && id) {
       updateMedia(id, {
         title,
         type: mediaType,
-        content,
+        content: processedContent,
         duration: Number(duration)
       });
     } else {
-      addMedia(title, mediaType, content, Number(duration));
+      addMedia(title, mediaType, processedContent, Number(duration));
     }
     
     navigate('/media');
@@ -84,6 +100,50 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
     if (isPreviewingVideo) {
       toast.error('Não foi possível carregar o vídeo. Verifique a URL.');
       setIsPreviewingVideo(false);
+    }
+  };
+
+  const renderVideoPreview = () => {
+    if (!isPreviewingVideo) return null;
+    
+    const embedUrl = getEmbedUrl(content);
+    const isYouTube = embedUrl.includes('youtube.com/embed/');
+    
+    if (isYouTube) {
+      return (
+        <Card className="mt-2 p-2">
+          <div className="aspect-video bg-black rounded-md overflow-hidden">
+            <iframe
+              src={embedUrl}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title="Video preview"
+            ></iframe>
+          </div>
+          <div className="text-xs text-gray-500 mt-1 text-center">
+            Pré-visualização do vídeo
+          </div>
+        </Card>
+      );
+    } else {
+      return (
+        <Card className="mt-2 p-2">
+          <div className="aspect-video bg-black rounded-md overflow-hidden">
+            <video
+              ref={videoRef}
+              src={content}
+              className="w-full h-full object-contain"
+              controls
+              autoPlay
+              onError={handleVideoError}
+            />
+          </div>
+          <div className="text-xs text-gray-500 mt-1 text-center">
+            Pré-visualização do vídeo
+          </div>
+        </Card>
+      );
     }
   };
 
@@ -147,6 +207,9 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
                 
                 {mediaType === 'video' && (
                   <div>
+                    <div className="text-xs text-gray-500 mb-2">
+                      Você pode usar URLs do YouTube como: https://youtu.be/XXXXXXXXXXX ou https://www.youtube.com/watch?v=XXXXXXXXXXX
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
@@ -157,23 +220,7 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
                       Visualizar Vídeo
                     </Button>
                     
-                    {isPreviewingVideo && (
-                      <Card className="mt-2 p-2">
-                        <div className="aspect-video bg-black rounded-md overflow-hidden">
-                          <video
-                            ref={videoRef}
-                            src={content}
-                            className="w-full h-full object-contain"
-                            controls
-                            autoPlay
-                            onError={handleVideoError}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1 text-center">
-                          Pré-visualização do vídeo
-                        </div>
-                      </Card>
-                    )}
+                    {renderVideoPreview()}
                   </div>
                 )}
                 
