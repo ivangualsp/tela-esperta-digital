@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Media } from '@/types';
 import { useDeviceAndPlaylist } from '@/hooks/useDeviceAndPlaylist';
@@ -34,30 +34,19 @@ const MediaViewer: React.FC = () => {
   // Use o hook de avanço automático de mídia
   useMediaAutoAdvance(currentMedia, videoRef, advanceToNextMedia);
 
-  // Efeito inicial para carregar o dispositivo e playlist
+  // Efeito inicial para configurar o intervalo de atualização
   useEffect(() => {
-    let isMounted = true;
-    
-    const initializeViewer = async () => {
-      if (isLoading && token) {
-        await refreshContent();
-      }
-    };
-    
-    initializeViewer();
-    
     // Configura o intervalo de atualização a cada 30 segundos
     refreshIntervalRef.current = window.setInterval(() => {
       refreshContent();
     }, 30000);
     
     return () => {
-      isMounted = false;
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
       }
     };
-  }, [token, refreshContent, isLoading]);
+  }, [refreshContent]);
 
   if (isLoading) {
     return <LoadingState />;

@@ -1,5 +1,5 @@
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -18,11 +18,11 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   const [device, setDevice] = useState<any>(null);
   const [playlist, setPlaylist] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   
   // Função para buscar dispositivo pelo token
   const fetchDeviceByToken = useCallback(async (tokenValue: string) => {
     try {
+      console.log('Buscando dispositivo pelo token:', tokenValue);
       const { data, error } = await supabase
         .from('devices')
         .select('*')
@@ -34,9 +34,10 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
         return null;
       }
       
+      console.log('Dispositivo encontrado:', data);
       return data;
     } catch (error) {
-      console.error('Erro ao buscar dispositivo:', error);
+      console.error('Exceção ao buscar dispositivo:', error);
       return null;
     }
   }, []);
@@ -44,6 +45,7 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   // Função para buscar playlist pelo ID
   const fetchPlaylistById = useCallback(async (playlistId: string) => {
     try {
+      console.log('Buscando playlist pelo ID:', playlistId);
       // Primeiro buscamos os detalhes da playlist
       const { data: playlistData, error: playlistError } = await supabase
         .from('playlists')
@@ -83,12 +85,14 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
         .filter(item => item.media) // Filtra itens sem mídia
         .map(item => item.media);
       
+      console.log('Playlist encontrada:', { ...playlistData, mediaItems });
+      
       return {
         ...playlistData,
         mediaItems
       };
     } catch (error) {
-      console.error('Erro ao buscar playlist:', error);
+      console.error('Exceção ao buscar playlist:', error);
       return null;
     }
   }, []);
@@ -105,7 +109,7 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
         console.error('Erro ao atualizar atividade do dispositivo:', error);
       }
     } catch (error) {
-      console.error('Erro ao atualizar atividade do dispositivo:', error);
+      console.error('Exceção ao atualizar atividade do dispositivo:', error);
     }
   }, []);
   
@@ -113,36 +117,52 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   const refreshContent = useCallback(async () => {
     if (!token) return;
     
-    const deviceInfo = await fetchDeviceByToken(token);
-    if (!deviceInfo) {
-      toast.error('Dispositivo não encontrado');
-      return;
-    }
+    console.log('Atualizando conteúdo para o token:', token);
+    setIsLoading(true);
     
-    await updateDeviceActivity(deviceInfo.id);
-    setDevice(deviceInfo);
-    
-    if (deviceInfo.playlist_id) {
-      const playlistInfo = await fetchPlaylistById(deviceInfo.playlist_id);
-      
-      // Se a playlist mudou ou foi atualizada, reiniciamos a exibição
-      // Corrigido: usando updated_at em vez de updatedAt para compatibilidade com o Supabase
-      if (playlistInfo && (!playlist || 
-          playlist.updated_at !== playlistInfo.updated_at || 
-          playlist.mediaItems.length !== playlistInfo.mediaItems.length)) {
-        
-        setPlaylist(playlistInfo);
-        toast.success('Conteúdo atualizado');
+    try {
+      const deviceInfo = await fetchDeviceByToken(token);
+      if (!deviceInfo) {
+        console.error('Dispositivo não encontrado pelo token:', token);
+        setDevice(null);
+        setPlaylist(null);
+        return;
       }
+      
+      await updateDeviceActivity(deviceInfo.id);
+      setDevice(deviceInfo);
+      
+      if (deviceInfo.playlist_id) {
+        const playlistInfo = await fetchPlaylistById(deviceInfo.playlist_id);
+        
+        if (playlistInfo && (!playlist || 
+            playlist.updated_at !== playlistInfo.updated_at || 
+            playlist.mediaItems.length !== playlistInfo.mediaItems.length)) {
+          
+          setPlaylist(playlistInfo);
+          toast.success('Conteúdo atualizado');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar conteúdo:', error);
+      toast.error('Erro ao atualizar conteúdo');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setLastUpdated(Date.now());
   }, [token, fetchDeviceByToken, fetchPlaylistById, updateDeviceActivity, playlist]);
 
   // Função para atualizar manualmente o conteúdo
-  const handleManualRefresh = () => {
+  const handleManualRefresh = useCallback(() => {
+    toast.info('Atualizando conteúdo...');
     refreshContent();
-  };
+  }, [refreshContent]);
+
+  // Efeito inicial para carregar o dispositivo e playlist
+  useEffect(() => {
+    if (token) {
+      refreshContent();
+    }
+  }, [token, refreshContent]);
 
   return {
     device,
