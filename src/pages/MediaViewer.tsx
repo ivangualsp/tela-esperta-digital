@@ -15,6 +15,7 @@ const MediaViewer: React.FC = () => {
   const [transitionActive, setTransitionActive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   const refreshIntervalRef = useRef<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   // Função para atualizar o conteúdo do visualizador
   const refreshContent = useCallback(() => {
@@ -99,11 +100,28 @@ const MediaViewer: React.FC = () => {
   useEffect(() => {
     if (playlist && playlist.mediaItems.length > 0) {
       const currentMedia = playlist.mediaItems[currentMediaIndex];
-      const timer = setTimeout(() => {
-        advanceToNextMedia();
-      }, currentMedia.duration * 1000);
       
-      return () => clearTimeout(timer);
+      // Para vídeos, esperamos o evento de finalização em vez de usar um timer
+      if (currentMedia.type === 'video' && videoRef.current) {
+        const videoElement = videoRef.current;
+        
+        const handleVideoEnd = () => {
+          advanceToNextMedia();
+        };
+        
+        videoElement.addEventListener('ended', handleVideoEnd);
+        
+        return () => {
+          videoElement.removeEventListener('ended', handleVideoEnd);
+        };
+      } else {
+        // Para outros tipos de mídia, usamos o tempo de duração configurado
+        const timer = setTimeout(() => {
+          advanceToNextMedia();
+        }, currentMedia.duration * 1000);
+        
+        return () => clearTimeout(timer);
+      }
     }
   }, [currentMediaIndex, playlist, advanceToNextMedia]);
 
@@ -155,10 +173,13 @@ const MediaViewer: React.FC = () => {
         return (
           <video 
             key={currentMedia.id}
+            ref={videoRef}
             src={currentMedia.content} 
             className="w-full h-full object-contain"
             autoPlay 
             muted
+            playsInline
+            onError={(e) => console.error('Video error:', e)}
           />
         );
       case 'image':
