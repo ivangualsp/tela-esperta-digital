@@ -23,19 +23,29 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   const fetchDeviceByToken = useCallback(async (tokenValue: string) => {
     try {
       console.log('Buscando dispositivo pelo token:', tokenValue);
+      
+      // Modificação principal: alterando a forma como fazemos a consulta
+      // Usando .eq sem o prefixo "eq." no valor do parâmetro
       const { data, error } = await supabase
         .from('devices')
         .select('*')
-        .eq('token', tokenValue)
-        .single();
+        .eq('token', tokenValue);
       
       if (error) {
         console.error('Erro ao buscar dispositivo:', error);
         return null;
       }
       
-      console.log('Dispositivo encontrado:', data);
-      return data;
+      // Verificar se temos pelo menos um resultado
+      if (!data || data.length === 0) {
+        console.log('Nenhum dispositivo encontrado para o token:', tokenValue);
+        return null;
+      }
+      
+      // Pegar o primeiro dispositivo encontrado
+      const deviceFound = data[0];
+      console.log('Dispositivo encontrado:', deviceFound);
+      return deviceFound;
     } catch (error) {
       console.error('Exceção ao buscar dispositivo:', error);
       return null;
@@ -123,9 +133,10 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
     try {
       const deviceInfo = await fetchDeviceByToken(token);
       if (!deviceInfo) {
-        console.error('Dispositivo não encontrado pelo token:', token);
+        console.log('Dispositivo não encontrado pelo token:', token);
         setDevice(null);
         setPlaylist(null);
+        setIsLoading(false);
         return;
       }
       
