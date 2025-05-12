@@ -16,6 +16,7 @@ const MediaViewer: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   const refreshIntervalRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const youtubeTimerRef = useRef<number | null>(null);
   
   // Função para atualizar o conteúdo do visualizador
   const refreshContent = useCallback(() => {
@@ -49,6 +50,12 @@ const MediaViewer: React.FC = () => {
   }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity, playlist]);
   
   const advanceToNextMedia = useCallback(() => {
+    // Clear any existing YouTube timer
+    if (youtubeTimerRef.current) {
+      clearTimeout(youtubeTimerRef.current);
+      youtubeTimerRef.current = null;
+    }
+    
     setTransitionActive(true);
     setTimeout(() => {
       setCurrentMediaIndex((prevIndex) => {
@@ -96,6 +103,9 @@ const MediaViewer: React.FC = () => {
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
       }
+      if (youtubeTimerRef.current) {
+        clearTimeout(youtubeTimerRef.current);
+      }
     };
   }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity, refreshContent]);
   
@@ -109,7 +119,7 @@ const MediaViewer: React.FC = () => {
           return (
             <div className="w-full h-full flex items-center justify-center">
               <iframe 
-                src={currentMedia.content} 
+                src={`${currentMedia.content}?autoplay=1&mute=1&controls=0&showinfo=0`}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -156,39 +166,74 @@ const MediaViewer: React.FC = () => {
   
   // Efeito para avançar automaticamente para o próximo item da playlist
   useEffect(() => {
-    if (playlist && playlist.mediaItems.length > 0) {
-      const currentMedia = playlist.mediaItems[currentMediaIndex];
+    if (!playlist || !playlist.mediaItems.length || currentMediaIndex >= playlist.mediaItems.length) {
+      return;
+    }
+    
+    const currentMedia = playlist.mediaItems[currentMediaIndex];
+    if (!currentMedia) return;
+    
+    // Clean up previous timers
+    if (youtubeTimerRef.current) {
+      clearTimeout(youtubeTimerRef.current);
+      youtubeTimerRef.current = null;
+    }
+    
+    // Para vídeos do YouTube, usamos um timer já que não temos acesso diretamente ao evento de fim
+    if (currentMedia.type === 'video' && currentMedia.content.includes('youtube.com/embed/')) {
+      youtubeTimerRef.current = window.setTimeout(() => {
+        advanceToNextMedia();
+      }, (currentMedia.duration || 5) * 1000); // Usamos a duração configurada ou 5 segundos como fallback
       
-      // Para vídeos do YouTube, usamos um timer já que não temos acesso diretamente ao evento de fim
-      if (currentMedia.type === 'video' && currentMedia.content.includes('youtube.com/embed/')) {
-        const timer = setTimeout(() => {
-          advanceToNextMedia();
-        }, (currentMedia.duration || 5) * 1000); // Usamos a duração configurada ou 5 segundos como fallback
+      return () => {
+        if (youtubeTimerRef.current) {
+          clearTimeout(youtubeTimerRef.current);
+        }
+      };
+    }
+    
+    // Para vídeos normais, esperamos o evento de finalização em vez de usar um timer
+    if (currentMedia.type === 'video' && !currentMedia.content.includes('youtube.com/embed/')) {
+      const videoElement = videoRef.current;
+      
+      if (videoElement) {
+        // Reset video element
+        videoElement.currentTime = 0;
         
-        return () => clearTimeout(timer);
-      }
-      
-      // Para vídeos normais, esperamos o evento de finalização em vez de usar um timer
-      else if (currentMedia.type === 'video' && videoRef.current) {
-        const videoElement = videoRef.current;
+        const playVideo = () => {
+          videoElement.play().catch(err => {
+            console.error('Error playing video:', err);
+            // If autoplay fails, set a timer as fallback
+            window.setTimeout(() => advanceToNextMedia(), (currentMedia.duration || 5) * 1000);
+          });
+        };
+        
+        // Try to play the video
+        playVideo();
         
         const handleVideoEnd = () => {
           advanceToNextMedia();
         };
         
         videoElement.addEventListener('ended', handleVideoEnd);
-        
         return () => {
           videoElement.removeEventListener('ended', handleVideoEnd);
         };
       } else {
-        // Para outros tipos de mídia, usamos o tempo de duração configurado
-        const timer = setTimeout(() => {
+        // Fallback if video element reference is not available
+        const timer = window.setTimeout(() => {
           advanceToNextMedia();
         }, (currentMedia.duration || 5) * 1000);
         
         return () => clearTimeout(timer);
       }
+    } else if (currentMedia.type !== 'video') {
+      // Para outros tipos de mídia, usamos o tempo de duração configurado
+      const timer = window.setTimeout(() => {
+        advanceToNextMedia();
+      }, (currentMedia.duration || 5) * 1000);
+      
+      return () => clearTimeout(timer);
     }
   }, [currentMediaIndex, playlist, advanceToNextMedia]);
 
