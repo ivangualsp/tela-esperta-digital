@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import Layout from '@/components/Layout';
@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MediaType } from '@/types';
+import { Card } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 interface MediaFormProps {
   editMode?: boolean;
@@ -29,6 +31,8 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
   const [mediaType, setMediaType] = useState<MediaType>('image');
   const [content, setContent] = useState('');
   const [duration, setDuration] = useState('5');
+  const [isPreviewingVideo, setIsPreviewingVideo] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   useEffect(() => {
     if (editMode && id) {
@@ -49,6 +53,7 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
     e.preventDefault();
     
     if (!title.trim() || !content.trim() || isNaN(Number(duration))) {
+      toast.error('Por favor, preencha todos os campos corretamente');
       return;
     }
     
@@ -64,6 +69,22 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
     }
     
     navigate('/media');
+  };
+
+  const handlePreviewVideo = () => {
+    if (!content) {
+      toast.error('Informe a URL do vídeo para visualizá-lo');
+      return;
+    }
+
+    setIsPreviewingVideo(true);
+  };
+
+  const handleVideoError = () => {
+    if (isPreviewingVideo) {
+      toast.error('Não foi possível carregar o vídeo. Verifique a URL.');
+      setIsPreviewingVideo(false);
+    }
   };
 
   return (
@@ -115,13 +136,65 @@ const MediaForm: React.FC<MediaFormProps> = ({ editMode = false }) => {
                 required
               />
             ) : (
-              <Input
-                id="content"
-                placeholder={`URL ${mediaType === 'video' ? 'do vídeo' : 'da imagem'}`}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                required
-              />
+              <div className="space-y-2">
+                <Input
+                  id="content"
+                  placeholder={`URL ${mediaType === 'video' ? 'do vídeo' : 'da imagem'}`}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  required
+                />
+                
+                {mediaType === 'video' && (
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePreviewVideo}
+                      className="mb-2"
+                      disabled={!content}
+                    >
+                      Visualizar Vídeo
+                    </Button>
+                    
+                    {isPreviewingVideo && (
+                      <Card className="mt-2 p-2">
+                        <div className="aspect-video bg-black rounded-md overflow-hidden">
+                          <video
+                            ref={videoRef}
+                            src={content}
+                            className="w-full h-full object-contain"
+                            controls
+                            autoPlay
+                            onError={handleVideoError}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 text-center">
+                          Pré-visualização do vídeo
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                )}
+                
+                {mediaType === 'image' && content && (
+                  <Card className="mt-2 p-2">
+                    <div className="aspect-video bg-black rounded-md overflow-hidden">
+                      <img
+                        src={content}
+                        alt="Pré-visualização"
+                        className="w-full h-full object-contain"
+                        onError={() => {
+                          toast.error('Não foi possível carregar a imagem. Verifique a URL.');
+                        }}
+                      />
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 text-center">
+                      Pré-visualização da imagem
+                    </div>
+                  </Card>
+                )}
+              </div>
             )}
           </div>
           

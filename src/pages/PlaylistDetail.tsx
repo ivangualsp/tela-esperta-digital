@@ -5,7 +5,6 @@ import { useApp } from '@/context/AppContext';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/EmptyState';
-import MediaCard from '@/components/MediaCard';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -20,11 +19,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { ArrowUp, ArrowDown } from 'lucide-react';
+import { toast } from 'sonner';
 
 const PlaylistDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { playlists, mediaItems, getPlaylistById, addMediaToPlaylist, removeMediaFromPlaylist } = useApp();
+  const { playlists, mediaItems, getPlaylistById, addMediaToPlaylist, removeMediaFromPlaylist, updatePlaylistMediaOrder } = useApp();
   const [playlist, setPlaylist] = useState<any>(null);
   const [isAddMediaDialogOpen, setIsAddMediaDialogOpen] = useState(false);
 
@@ -54,6 +56,58 @@ const PlaylistDetail: React.FC = () => {
     if (id) {
       removeMediaFromPlaylist(id, mediaId);
     }
+  };
+
+  const handleDragEnd = (result: any) => {
+    // Ignorar se o item foi solto fora da lista
+    if (!result.destination) {
+      return;
+    }
+
+    // Ignorar se o item foi solto na mesma posição
+    if (result.destination.index === result.source.index) {
+      return;
+    }
+
+    // Criar uma cópia dos itens da playlist
+    const items = Array.from(playlist.mediaItems);
+    
+    // Remover o item arrastado da lista
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    
+    // Adicionar o item na nova posição
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    // Atualizar a ordem no contexto da aplicação
+    if (id) {
+      const newOrder = items.map(item => item.id);
+      updatePlaylistMediaOrder(id, newOrder);
+      toast.success('Ordem da playlist atualizada');
+    }
+  };
+
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    if (!id || !playlist) return;
+    
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    // Verificar se o novo índice está dentro dos limites da lista
+    if (newIndex < 0 || newIndex >= playlist.mediaItems.length) {
+      return;
+    }
+    
+    const items = Array.from(playlist.mediaItems);
+    const item = items[index];
+    
+    // Remover o item da posição atual
+    items.splice(index, 1);
+    
+    // Inserir o item na nova posição
+    items.splice(newIndex, 0, item);
+    
+    // Atualizar a ordem
+    const newOrder = items.map(item => item.id);
+    updatePlaylistMediaOrder(id, newOrder);
   };
 
   if (!playlist) {
@@ -89,36 +143,78 @@ const PlaylistDetail: React.FC = () => {
             <CardContent className="p-4">
               <h3 className="font-medium text-gray-700 mb-2">Sequência de Reprodução</h3>
               <p className="text-sm text-gray-500 mb-4">
-                As mídias serão exibidas na ordem abaixo. Você pode remover mídias usando os botões de ações.
+                As mídias serão exibidas na ordem abaixo. Você pode arrastar para reordenar ou usar os botões de setas.
               </p>
               
-              <div className="space-y-3">
-                {playlist.mediaItems.map((media: any, index: number) => (
-                  <div key={media.id} className="flex items-center bg-white border rounded-md p-3">
-                    <div className="flex items-center flex-1">
-                      <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-medium mr-3">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <h4 className="font-medium">{media.title}</h4>
-                        <p className="text-xs text-gray-500 capitalize">{media.type} • {media.duration}s</p>
-                      </div>
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="mediaItems">
+                  {(provided) => (
+                    <div 
+                      className="space-y-3"
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                    >
+                      {playlist.mediaItems.map((media: any, index: number) => (
+                        <Draggable key={media.id} draggableId={media.id} index={index}>
+                          {(provided) => (
+                            <div 
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className="flex items-center bg-white border rounded-md p-3 relative"
+                            >
+                              <div className="flex items-center flex-1">
+                                <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-medium mr-3">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium">{media.title}</h4>
+                                  <p className="text-xs text-gray-500 capitalize">{media.type} • {media.duration}s</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-1 mr-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-6 w-6 p-0" 
+                                    onClick={() => moveItem(index, 'up')}
+                                    disabled={index === 0}
+                                  >
+                                    <ArrowUp className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-6 w-6 p-0" 
+                                    onClick={() => moveItem(index, 'down')}
+                                    disabled={index === playlist.mediaItems.length - 1}
+                                  >
+                                    <ArrowDown className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      ⋮
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleRemoveMedia(media.id)}>
+                                      Remover da playlist
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          ⋮
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleRemoveMedia(media.id)}>
-                          Remover da playlist
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))}
-              </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
             </CardContent>
           </Card>
         </div>
