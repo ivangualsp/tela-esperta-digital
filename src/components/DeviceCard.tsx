@@ -24,7 +24,8 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onEdit, onDelete }) => 
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
   
-  const deviceUrl = `${window.location.origin}/view/${device.token}`;
+  // Fixed URL path from /view/ to /viewer/ to match the route in App.tsx
+  const deviceUrl = `${window.location.origin}/viewer/${device.token}`;
   
   const handleShowQrCode = async () => {
     try {
