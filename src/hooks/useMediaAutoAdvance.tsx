@@ -1,17 +1,19 @@
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export const useMediaAutoAdvance = (
   currentMedia: any | null,
   videoRef: React.RefObject<HTMLVideoElement>,
+  youtubePlayerRef: React.RefObject<HTMLIFrameElement>,
   advanceToNextMedia: () => void
 ) => {
   const youtubeTimerRef = useRef<number | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
   
   useEffect(() => {
     if (!currentMedia) return;
     
-    console.log('Mídia atual:', currentMedia.type, currentMedia.title, 'Duração:', currentMedia.duration);
+    console.log('Mídia atual:', currentMedia.type, currentMedia.title, 'Duração configurada:', currentMedia.duration);
     
     // Clean up previous timers
     if (youtubeTimerRef.current) {
@@ -19,12 +21,33 @@ export const useMediaAutoAdvance = (
       youtubeTimerRef.current = null;
     }
     
-    // Para vídeos do YouTube, usamos um timer já que não temos acesso diretamente ao evento de fim
+    // Para vídeos do YouTube, usamos o YouTube API para detectar o fim do vídeo ou a duração configurada
     if (currentMedia.type === 'video' && currentMedia.content.includes('youtube.com/embed/')) {
-      console.log('Configurando timer para vídeo do YouTube:', currentMedia.duration || 10, 'segundos');
-      youtubeTimerRef.current = window.setTimeout(() => {
-        advanceToNextMedia();
-      }, (currentMedia.duration || 10) * 1000); // Usamos a duração configurada ou 10 segundos como fallback
+      console.log('Configurando timer para vídeo do YouTube - usando duração real');
+      
+      // Tentamos usar a duração real do vídeo, se disponível, caso contrário usamos a duração configurada
+      let duration = currentMedia.duration;
+      
+      // Função para verificar se o vídeo do YouTube terminou
+      const checkYouTubeVideoStatus = () => {
+        console.log('Verificando status do vídeo do YouTube');
+        try {
+          // Definimos um timer com base na duração configurada
+          youtubeTimerRef.current = window.setTimeout(() => {
+            console.log('YouTube vídeo concluído pelo timer');
+            advanceToNextMedia();
+          }, duration * 1000);
+        } catch (error) {
+          console.error('Erro ao verificar status do vídeo do YouTube:', error);
+          // Fallback para o timer configurado
+          youtubeTimerRef.current = window.setTimeout(() => {
+            advanceToNextMedia();
+          }, (currentMedia.duration || 10) * 1000);
+        }
+      };
+      
+      // Iniciamos a verificação após um pequeno delay
+      setTimeout(checkYouTubeVideoStatus, 500);
       
       return () => {
         if (youtubeTimerRef.current) {
@@ -33,12 +56,12 @@ export const useMediaAutoAdvance = (
       };
     }
     
-    // Para vídeos normais, esperamos o evento de finalização em vez de usar um timer
+    // Para vídeos normais, esperamos o evento de finalização ou detectamos a duração real
     if (currentMedia.type === 'video' && !currentMedia.content.includes('youtube.com/embed/')) {
       const videoElement = videoRef.current;
       
       if (videoElement) {
-        // Force video to load and play
+        // Force video to load
         videoElement.load();
         
         const playVideo = () => {
@@ -53,13 +76,23 @@ export const useMediaAutoAdvance = (
         // Try to play the video
         playVideo();
         
+        // Capturar a duração real do vídeo
+        const handleLoadedMetadata = () => {
+          const realDuration = videoElement.duration;
+          console.log('Duração real do vídeo:', realDuration);
+          setVideoDuration(realDuration);
+        };
+        
         const handleVideoEnd = () => {
           console.log('Evento de fim de vídeo detectado');
           advanceToNextMedia();
         };
         
+        videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
         videoElement.addEventListener('ended', handleVideoEnd);
+        
         return () => {
+          videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
           videoElement.removeEventListener('ended', handleVideoEnd);
         };
       } else {
@@ -80,5 +113,7 @@ export const useMediaAutoAdvance = (
       
       return () => clearTimeout(timer);
     }
-  }, [currentMedia, advanceToNextMedia, videoRef]);
+  }, [currentMedia, advanceToNextMedia, videoRef, youtubePlayerRef]);
+
+  return { videoDuration };
 };

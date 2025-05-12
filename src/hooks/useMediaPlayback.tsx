@@ -52,7 +52,7 @@ export const useMediaPlayback = (playlist: any | null): MediaPlaybackHookResult 
             <div className="w-full h-full flex items-center justify-center">
               <iframe 
                 ref={youtubePlayerRef}
-                src={`${currentMedia.content}?autoplay=1&mute=0&controls=0&showinfo=0&rel=0&modestbranding=1`}
+                src={`${currentMedia.content}?autoplay=1&mute=0&controls=0&showinfo=0&rel=0&modestbranding=1&enablejsapi=1`}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen

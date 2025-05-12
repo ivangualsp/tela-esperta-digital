@@ -28,6 +28,7 @@ const MediaViewer: React.FC = () => {
     currentMediaIndex,
     transitionActive,
     videoRef,
+    youtubePlayerRef,
     advanceToNextMedia,
     renderMedia
   } = useMediaPlayback(playlist);
@@ -35,7 +36,7 @@ const MediaViewer: React.FC = () => {
   const currentMedia: Media | null = playlist?.mediaItems?.[currentMediaIndex] || null;
   
   // Use o hook de avanço automático de mídia
-  useMediaAutoAdvance(currentMedia, videoRef, advanceToNextMedia);
+  useMediaAutoAdvance(currentMedia, videoRef, youtubePlayerRef, advanceToNextMedia);
 
   // Efeito inicial para configurar o intervalo de atualização
   useEffect(() => {
