@@ -17,6 +17,7 @@ const MediaViewer: React.FC = () => {
   const refreshIntervalRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const youtubeTimerRef = useRef<number | null>(null);
+  const youtubePlayerRef = useRef<HTMLIFrameElement | null>(null);
   
   // Função para atualizar o conteúdo do visualizador
   const refreshContent = useCallback(() => {
@@ -116,10 +117,12 @@ const MediaViewer: React.FC = () => {
     switch (currentMedia.type) {
       case 'video':
         if (currentMedia.content.includes('youtube.com/embed/')) {
+          // For YouTube videos
           return (
             <div className="w-full h-full flex items-center justify-center">
               <iframe 
-                src={`${currentMedia.content}?autoplay=1&mute=1&controls=0&showinfo=0`}
+                ref={youtubePlayerRef}
+                src={`${currentMedia.content}?autoplay=1&mute=0&controls=0&showinfo=0&rel=0&modestbranding=1`}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -128,6 +131,7 @@ const MediaViewer: React.FC = () => {
             </div>
           );
         } else {
+          // For local videos
           return (
             <video 
               key={currentMedia.id}
@@ -135,9 +139,15 @@ const MediaViewer: React.FC = () => {
               src={currentMedia.content} 
               className="w-full h-full object-contain"
               autoPlay 
-              muted
+              loop={false}
               playsInline
-              onError={(e) => console.error('Video error:', e)}
+              controls={false}
+              onEnded={() => advanceToNextMedia()}
+              onError={(e) => {
+                console.error('Video error:', e);
+                // Advance to next media if there's an error playing this video
+                setTimeout(advanceToNextMedia, 1000);
+              }}
             />
           );
         }
@@ -147,6 +157,10 @@ const MediaViewer: React.FC = () => {
             src={currentMedia.content} 
             alt={currentMedia.title} 
             className="w-full h-full object-contain"
+            onError={() => {
+              console.error('Image failed to load:', currentMedia.content);
+              setTimeout(advanceToNextMedia, 1000);
+            }}
           />
         );
       case 'news':
@@ -183,7 +197,7 @@ const MediaViewer: React.FC = () => {
     if (currentMedia.type === 'video' && currentMedia.content.includes('youtube.com/embed/')) {
       youtubeTimerRef.current = window.setTimeout(() => {
         advanceToNextMedia();
-      }, (currentMedia.duration || 5) * 1000); // Usamos a duração configurada ou 5 segundos como fallback
+      }, (currentMedia.duration || 8) * 1000); // Usamos a duração configurada ou 8 segundos como fallback
       
       return () => {
         if (youtubeTimerRef.current) {
@@ -197,8 +211,8 @@ const MediaViewer: React.FC = () => {
       const videoElement = videoRef.current;
       
       if (videoElement) {
-        // Reset video element
-        videoElement.currentTime = 0;
+        // Force video to load and play
+        videoElement.load();
         
         const playVideo = () => {
           videoElement.play().catch(err => {

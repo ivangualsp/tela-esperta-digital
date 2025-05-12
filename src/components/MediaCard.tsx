@@ -44,6 +44,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onEdit, onDelete, showActi
               className="w-full h-full object-cover" 
               controls={false}
               muted
+              preload="metadata"
             >
               Seu navegador não suporta vídeos.
             </video>
