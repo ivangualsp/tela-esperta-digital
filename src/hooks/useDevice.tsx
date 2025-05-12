@@ -19,7 +19,7 @@ export const useDevice = () => {
       }
 
       // Imprimindo informações detalhadas para debug
-      console.log('URL base Supabase:', supabase.getSusebaseUrl);
+      console.log('URL base Supabase:', supabase.getUrl());
       
       // Usando a consulta correta para o Supabase
       const { data, error } = await supabase

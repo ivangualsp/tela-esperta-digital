@@ -73,7 +73,7 @@ export const useMediaPlayback = (playlist: any | null): MediaPlaybackHookResult 
               muted={false}
               loop={false}
               playsInline
-              controls
+              controls={false}
               onLoadedData={() => console.log('Vídeo carregado')}
               onPlay={() => console.log('Vídeo iniciou reprodução')}
               onEnded={() => {
