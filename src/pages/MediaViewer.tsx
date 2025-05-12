@@ -9,6 +9,9 @@ import MediaViewerContent from '@/components/MediaViewerContent';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 
+// Verificar se estamos em modo de desenvolvimento
+const isDev = import.meta.env.MODE === 'development';
+
 const MediaViewer: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const refreshIntervalRef = useRef<number | null>(null);
@@ -67,7 +70,9 @@ const MediaViewer: React.FC = () => {
     return (
       <ErrorState
         message="Dispositivo não encontrado"
-        subMessage="O token fornecido não corresponde a nenhum dispositivo registrado ou houve um erro de comunicação."
+        subMessage={isDev 
+          ? "Em modo de desenvolvimento: você pode criar um dispositivo no painel administrativo ou verificar se está utilizando um token válido."
+          : "O token fornecido não corresponde a nenhum dispositivo registrado ou houve um erro de comunicação."}
         token={token || 'Não fornecido'}
         onRetry={handleManualRefresh}
       />

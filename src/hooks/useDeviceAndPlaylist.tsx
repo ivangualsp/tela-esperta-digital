@@ -14,6 +14,10 @@ type DevicePlaylistHookResult = {
   handleManualRefresh: () => void;
 };
 
+// Modo de desenvolvimento para testes
+const isDev = import.meta.env.MODE === 'development';
+const useDevFallbackData = isDev;
+
 export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistHookResult => {
   const [device, setDevice] = useState<any>(null);
   const [playlist, setPlaylist] = useState<any>(null);
@@ -28,6 +32,10 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
         console.error('Token inválido ou vazio');
         return null;
       }
+
+      // Imprimindo a URL completa da consulta para debugging
+      const url = `${supabase.supabaseUrl}/rest/v1/devices?select=*&token=eq.${encodeURIComponent(tokenValue.trim())}`;
+      console.log('URL da consulta:', url);
       
       // Usando a consulta correta para o Supabase
       const { data, error } = await supabase
@@ -47,6 +55,26 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
       // Verificar se temos pelo menos um resultado
       if (!data || data.length === 0) {
         console.log('Nenhum dispositivo encontrado para o token:', tokenValue);
+        
+        // Em modo de desenvolvimento, criar um dispositivo de teste se necessário
+        if (useDevFallbackData && isDev) {
+          console.log('Modo de desenvolvimento: criando dispositivo de teste');
+          const devDevice = {
+            id: 'dev-device-id',
+            name: 'Dispositivo de Teste',
+            description: 'Criado automaticamente para desenvolvimento',
+            token: tokenValue,
+            playlist_id: 'dev-playlist-id',
+            last_active: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          // Em produção, aqui criaríamos o dispositivo no Supabase
+          // Por enquanto, apenas retornamos o dispositivo simulado
+          return devDevice;
+        }
+        
         return null;
       }
       
@@ -65,6 +93,35 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   const fetchPlaylistById = useCallback(async (playlistId: string) => {
     try {
       console.log('Buscando playlist pelo ID:', playlistId);
+      
+      // Modo de desenvolvimento - criar playlist de teste
+      if (useDevFallbackData && isDev && playlistId === 'dev-playlist-id') {
+        console.log('Modo de desenvolvimento: criando playlist de teste');
+        return {
+          id: 'dev-playlist-id',
+          name: 'Playlist de Teste',
+          description: 'Criada automaticamente para desenvolvimento',
+          mediaItems: [
+            {
+              id: 'dev-media-1',
+              title: 'Imagem de Teste',
+              type: 'image',
+              content: 'https://picsum.photos/800/600',
+              duration: 5
+            },
+            {
+              id: 'dev-media-2',
+              title: 'Notícia de Teste',
+              type: 'news',
+              content: '<h1>Notícia de Teste</h1><p>Este é um exemplo de conteúdo para testes durante o desenvolvimento.</p>',
+              duration: 10
+            }
+          ],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+      
       // Primeiro buscamos os detalhes da playlist
       const { data: playlistData, error: playlistError } = await supabase
         .from('playlists')
@@ -119,6 +176,12 @@ export const useDeviceAndPlaylist = (token: string | undefined): DevicePlaylistH
   // Função para atualizar a atividade do dispositivo
   const updateDeviceActivity = useCallback(async (deviceId: string) => {
     try {
+      // No modo de desenvolvimento, simulamos a atualização
+      if (useDevFallbackData && isDev && deviceId === 'dev-device-id') {
+        console.log('Modo de desenvolvimento: simulando atualização de atividade');
+        return;
+      }
+      
       const { error } = await supabase
         .from('devices')
         .update({ last_active: new Date().toISOString() })
