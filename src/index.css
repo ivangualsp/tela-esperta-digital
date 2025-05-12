@@ -107,13 +107,4 @@
   transform: scale(1.1);
   transition: opacity 500ms, transform 500ms;
 }
-a[href*="lovable.dev"],
-iframe[src*="lovable.dev"],
-div[style*="Edit with Lovable'l,
-.lovable-badge {
-display: none !important;
-opacity: O !important;
-visibility: hidden 'important;
-pointer-events: none !important;
-position: absolute !important;
-z-index: -9999 !important;
+
