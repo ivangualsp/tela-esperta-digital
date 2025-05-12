@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { Media } from '@/types';
@@ -13,18 +13,52 @@ const MediaViewer: React.FC = () => {
   const [device, setDevice] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [transitionActive, setTransitionActive] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+  const refreshIntervalRef = useRef<number | null>(null);
+  
+  // Função para atualizar o conteúdo do visualizador
+  const refreshContent = useCallback(() => {
+    if (!token) return;
+    
+    const deviceInfo = getDeviceByToken(token);
+    if (!deviceInfo) {
+      toast.error('Dispositivo não encontrado');
+      return;
+    }
+    
+    updateDeviceActivity(deviceInfo.id);
+    setDevice(deviceInfo);
+    
+    if (deviceInfo.playlistId) {
+      const playlistInfo = getPlaylistById(deviceInfo.playlistId);
+      
+      // Se a playlist mudou ou foi atualizada, reiniciamos a exibição
+      if (playlistInfo && (!playlist || 
+          playlist.updatedAt !== playlistInfo.updatedAt || 
+          playlist.mediaItems.length !== playlistInfo.mediaItems.length)) {
+        
+        setPlaylist(playlistInfo);
+        // Reinicia para o primeiro item da playlist quando houver alteração
+        setCurrentMediaIndex(0);
+        toast.success('Conteúdo atualizado');
+      }
+    }
+    
+    setLastUpdated(Date.now());
+  }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity, playlist]);
   
   const advanceToNextMedia = useCallback(() => {
     setTransitionActive(true);
     setTimeout(() => {
       setCurrentMediaIndex((prevIndex) => {
-        const nextIndex = prevIndex + 1 >= playlist.mediaItems.length ? 0 : prevIndex + 1;
+        const nextIndex = prevIndex + 1 >= (playlist?.mediaItems.length || 0) ? 0 : prevIndex + 1;
         return nextIndex;
       });
       setTransitionActive(false);
     }, 500);
   }, [playlist]);
   
+  // Efeito inicial para carregar o dispositivo e playlist
   useEffect(() => {
     if (token) {
       const deviceInfo = getDeviceByToken(token);
@@ -48,8 +82,20 @@ const MediaViewer: React.FC = () => {
         toast.error('Dispositivo não encontrado');
       }
     }
-  }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity]);
+    
+    // Configura o intervalo de atualização a cada 30 segundos
+    refreshIntervalRef.current = window.setInterval(() => {
+      refreshContent();
+    }, 30000);
+    
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [token, getDeviceByToken, getPlaylistById, updateDeviceActivity, refreshContent]);
   
+  // Efeito para avançar automaticamente para o próximo item da playlist
   useEffect(() => {
     if (playlist && playlist.mediaItems.length > 0) {
       const currentMedia = playlist.mediaItems[currentMediaIndex];
@@ -60,6 +106,11 @@ const MediaViewer: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [currentMediaIndex, playlist, advanceToNextMedia]);
+
+  // Função para atualizar manualmente o conteúdo
+  const handleManualRefresh = () => {
+    refreshContent();
+  };
 
   if (isLoading) {
     return (
@@ -86,6 +137,12 @@ const MediaViewer: React.FC = () => {
         <div className="mt-4 text-gray-400 text-sm">
           Dispositivo: {device.name}
         </div>
+        <button 
+          onClick={handleManualRefresh}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+        >
+          Atualizar conteúdo
+        </button>
       </div>
     );
   }
@@ -137,8 +194,22 @@ const MediaViewer: React.FC = () => {
         {renderMedia()}
       </div>
       
-      <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-        {currentMediaIndex + 1} / {playlist.mediaItems.length}
+      <div className="absolute bottom-4 right-4 flex items-center space-x-2">
+        <button
+          onClick={handleManualRefresh}
+          className="bg-black/50 text-white text-xs px-2 py-1 rounded-full hover:bg-black/70 transition-colors"
+          title="Atualizar conteúdo"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 2v6h-6"></path>
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+            <path d="M3 22v-6h6"></path>
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+          </svg>
+        </button>
+        <div className="bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+          {currentMediaIndex + 1} / {playlist.mediaItems.length}
+        </div>
       </div>
     </div>
   );
